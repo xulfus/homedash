@@ -47,7 +47,7 @@ def home():
         for v in visits[:2]:
             trams.append({'line': line_num, 'mins': v['estimatedMinutesUntilDeparture']})
     except Exception as e:
-        print(e)
+        print(f"Error fetching data: {e}", flush=True)
         trams = [{'line': '?', 'mins': 'Error'}]
 
     return render_template_string(HTML_TEMPLATE,
