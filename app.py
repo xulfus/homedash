@@ -1,4 +1,5 @@
 from flask import Flask, render_template_string
+from datetime import datetime, timedelta
 import requests
 
 app = Flask(__name__)
@@ -8,6 +9,7 @@ LAT = "61.4991"
 LON = "23.7871"
 NYSSE_URL = "https://lissu.tampere.fi/timetable/rest/stopdisplays/0870"
 ELECTRICITY_URL = "https://api.spot-hinta.fi/JustNow"
+CHEAPEST_URL = "https://www.sahkohinta-api.fi/api/v1/halpa?tunnit=2&tulos=sarja"
 
 HTML_TEMPLATE = """
 <!DOCTYPE html>
@@ -32,6 +34,7 @@ HTML_TEMPLATE = """
     <hr>
     <div class="info">Sähkö nyt</div>
     <div class="temp">{{ electricity }} c/kWh</div>
+    <div class="info" style="margin-top: 20px;">{{ cheap_period }}</div>
 </body>
 </html>
 """
@@ -74,10 +77,37 @@ def home():
         app.logger.error(f"Electricity Fetch Error: {e}")
         electricity = "?"
 
+    # 4. Get Cheapest 2-hour period in next 12 hours
+    try:
+        now = datetime.now()
+        end_time = now + timedelta(hours=12)
+        aikaraja = f"{now.strftime('%Y-%m-%dT%H:00')}_{end_time.strftime('%Y-%m-%dT%H:00')}"
+        c_res = requests.get(f"{CHEAPEST_URL}&aikaraja={aikaraja}", timeout=10)
+        c_data = c_res.json()
+
+        start_hour = int(c_data[0]['aikaleima_suomi'].split('T')[1].split(':')[0])
+        end_hour = (int(c_data[-1]['aikaleima_suomi'].split('T')[1].split(':')[0]) + 1) % 24
+
+        # Check if we're currently in the cheap period
+        current_hour = now.hour
+        in_cheap_period = False
+        if start_hour < end_hour:
+            in_cheap_period = start_hour <= current_hour < end_hour
+        else:  # Wraps around midnight
+            in_cheap_period = current_hour >= start_hour or current_hour < end_hour
+
+        cheap_period = f"Halvin 2h: {start_hour:02d}-{end_hour:02d}"
+        if in_cheap_period:
+            cheap_period += " (nyt)"
+    except Exception as e:
+        app.logger.error(f"Cheapest Period Fetch Error: {e}")
+        cheap_period = ""
+
     return render_template_string(HTML_TEMPLATE,
         temp=round(weather_data['temperature_2m']),
         feels=round(weather_data['apparent_temperature']),
         wind=round(weather_data['wind_speed_10m']),
         trams=trams,
-        electricity=electricity
+        electricity=electricity,
+        cheap_period=cheap_period
     )
