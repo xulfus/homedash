@@ -4,6 +4,28 @@ import requests
 
 app = Flask(__name__)
 
+# Simple cache for API responses
+cache = {
+    'electricity': {'data': None, 'timestamp': None},
+    'cheapest': {'data': None, 'timestamp': None}
+}
+CACHE_TTL = 300  # 5 minutes in seconds
+
+
+def get_cached(key, fetch_func):
+    """Return cached data if fresh, otherwise fetch and cache."""
+    now = datetime.now()
+    if cache[key]['data'] and cache[key]['timestamp']:
+        age = (now - cache[key]['timestamp']).total_seconds()
+        if age < CACHE_TTL:
+            app.logger.info(f"Using cached {key} (age: {int(age)}s)")
+            return cache[key]['data']
+
+    data = fetch_func()
+    cache[key]['data'] = data
+    cache[key]['timestamp'] = now
+    return data
+
 # Tampere Coordinates
 LAT = "61.4991"
 LON = "23.7871"
@@ -68,22 +90,29 @@ def home():
         app.logger.error(f"Quick Fetch Error: {e}")
         trams = [{'mins': 'Error'}]
 
-    # 3. Get Electricity Price
+    # 3. Get Electricity Price (cached)
+    def fetch_electricity():
+        res = requests.get(ELECTRICITY_URL, timeout=10)
+        return res.json()
+
     try:
-        e_res = requests.get(ELECTRICITY_URL, timeout=10)
-        e_data = e_res.json()
+        e_data = get_cached('electricity', fetch_electricity)
         electricity = f"{e_data['PriceWithTax'] * 100:.1f}"
     except Exception as e:
         app.logger.error(f"Electricity Fetch Error: {e}")
         electricity = "?"
 
-    # 4. Get Cheapest 2-hour period in next 12 hours
-    try:
+    # 4. Get Cheapest 2-hour period in next 12 hours (cached)
+    def fetch_cheapest():
         now = datetime.now()
         end_time = now + timedelta(hours=12)
         aikaraja = f"{now.strftime('%Y-%m-%dT%H:00')}_{end_time.strftime('%Y-%m-%dT%H:00')}"
-        c_res = requests.get(f"{CHEAPEST_URL}&aikaraja={aikaraja}", timeout=10)
-        c_data = c_res.json()
+        res = requests.get(f"{CHEAPEST_URL}&aikaraja={aikaraja}", timeout=10)
+        return res.json()
+
+    try:
+        c_data = get_cached('cheapest', fetch_cheapest)
+        now = datetime.now()
 
         start_hour = int(c_data[0]['aikaleima_suomi'].split('T')[1].split(':')[0])
         end_hour = (int(c_data[-1]['aikaleima_suomi'].split('T')[1].split(':')[0]) + 1) % 24
