@@ -7,6 +7,7 @@ app = Flask(__name__)
 LAT = "61.4991"
 LON = "23.7871"
 NYSSE_URL = "https://lissu.tampere.fi/timetable/rest/stopdisplays/0870"
+ELECTRICITY_URL = "https://api.spot-hinta.fi/JustNow"
 
 HTML_TEMPLATE = """
 <!DOCTYPE html>
@@ -28,6 +29,9 @@ HTML_TEMPLATE = """
     {% for tram in trams %}
         <div class="tram">RATIKKA {{ tram.line }}: {{ tram.mins }} min</div>
     {% endfor %}
+    <hr>
+    <div class="info">Sähkö nyt</div>
+    <div class="temp">{{ electricity }} c/kWh</div>
 </body>
 </html>
 """
@@ -61,9 +65,19 @@ def home():
         app.logger.error(f"Quick Fetch Error: {e}")
         trams = [{'mins': 'Error'}]
 
+    # 3. Get Electricity Price
+    try:
+        e_res = requests.get(ELECTRICITY_URL, timeout=10)
+        e_data = e_res.json()
+        electricity = f"{e_data['PriceWithTax']:.2f}"
+    except Exception as e:
+        app.logger.error(f"Electricity Fetch Error: {e}")
+        electricity = "?"
+
     return render_template_string(HTML_TEMPLATE,
         temp=round(weather_data['temperature_2m']),
         feels=round(weather_data['apparent_temperature']),
         wind=round(weather_data['wind_speed_10m']),
-        trams=trams
+        trams=trams,
+        electricity=electricity
     )
