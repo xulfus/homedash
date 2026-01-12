@@ -39,16 +39,27 @@ def home():
     weather_data = requests.get(w_url).json()['current']
 
     # 2. Get Trams
-    trams = []
     try:
-        t_data = requests.get(NYSSE_URL).json()
-        visits = t_data['nextStopVisits'][0]['stopVisits']
-        line_num = t_data['nextStopVisits'][0]['directionOfLine']['shortName']
-        for v in visits[:2]:
-            trams.append({'line': line_num, 'mins': v['estimatedMinutesUntilDeparture']})
+        t_res = requests.get(NYSSE_URL, timeout=10)
+        t_data = t_res.json()
+        
+        trams = []
+        # We navigate straight to the list of arrival times
+        # nextStopVisits[0] -> stopVisits
+        if 'nextStopVisits' in t_data and t_data['nextStopVisits']:
+            stop_visits = t_data['nextStopVisits'][0].get('stopVisits', [])
+            
+            for v in stop_visits[:2]:
+                # Get the minutes, default to '?' if something is weird
+                m = v.get('estimatedMinutesUntilDeparture', '?')
+                trams.append({'mins': m})
+        
+        if not trams:
+            trams = [{'mins': 'Ei vuoroja'}]
+
     except Exception as e:
-        print(f"Error fetching data: {e}", flush=True)
-        trams = [{'line': '?', 'mins': 'Error'}]
+        app.logger.error(f"Quick Fetch Error: {e}")
+        trams = [{'mins': 'Error'}]
 
     return render_template_string(HTML_TEMPLATE,
         temp=round(weather_data['temperature_2m']),
