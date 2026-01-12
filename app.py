@@ -6,6 +6,7 @@ app = Flask(__name__)
 
 # Simple cache for API responses
 cache = {
+    'weather': {'data': None, 'timestamp': None},
     'electricity': {'data': None, 'timestamp': None},
     'cheapest': {'data': None, 'timestamp': None}
 }
@@ -63,9 +64,12 @@ HTML_TEMPLATE = """
 
 @app.route('/')
 def home():
-    # 1. Get Weather
-    w_url = f"https://api.open-meteo.com/v1/forecast?latitude={LAT}&longitude={LON}&current=temperature_2m,apparent_temperature,wind_speed_10m&wind_speed_unit=ms"
-    weather_data = requests.get(w_url).json()['current']
+    # 1. Get Weather (cached)
+    def fetch_weather():
+        w_url = f"https://api.open-meteo.com/v1/forecast?latitude={LAT}&longitude={LON}&current=temperature_2m,apparent_temperature,wind_speed_10m&wind_speed_unit=ms"
+        return requests.get(w_url, timeout=10).json()['current']
+
+    weather_data = get_cached('weather', fetch_weather)
 
     # 2. Get Trams
     try:
