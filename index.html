@@ -49,6 +49,8 @@
 
 <body>
 
+    <div id="time"></div>
+
     <div id="weather">--°C</div>
     <div id="description">Ladataan säätä...</div>
 
@@ -64,33 +66,12 @@
         async function updateDashboard() {
             // 1. Fetch Weather (Open-Meteo - No Registration Needed)
             // Coordinates for Tampere: 61.4991, 23.7871
-            try {
-                // We add wind_speed_unit=ms because in Finland we use m/s, not km/h
-                const url = 'https://api.open-meteo.com/v1/forecast?latitude=61.4991&longitude=23.7871&current=temperature_2m,apparent_temperature,wind_speed_10m,weather_code&wind_speed_unit=ms';
-
-                const res = await fetch(url);
-                const data = await res.json();
-                const current = data.current;
-
-                const temp = Math.round(current.temperature_2m);
-                const feelsLike = Math.round(current.apparent_temperature);
-                const wind = Math.round(current.wind_speed_10m);
-
-                document.getElementById('weather').innerHTML = `
-            ${temp}°C 
-            <div style="font-size: 24px; color: #555;">
-                Tuntuu kuin: ${feelsLike}°C | Tuuli: ${wind} m/s
-            </div>
-        `;
-                document.getElementById('description').innerHTML = getWeatherText(current.weather_code);
-            } catch (e) {
-                document.getElementById('weather').innerHTML = "Säävirhe";
-            }
+            updateWeather()
 
             // 2. Fetch Trams (Nysse REST Endpoint)
             try {
                 // IMPORTANT: Insert your specific REST URL here
-                const tRes = await fetch('https://lissu.tampere.fi/timetable/rest/stopdisplays/0870');
+                const tRes = await fetch('https://corsproxy.io/?' + encodeURIComponent('https://lissu.tampere.fi/timetable/rest/stopdisplays/0870'));
                 const tData = await tRes.json();
                 const visits = tData.nextStopVisits[0].stopVisits;
 
@@ -101,6 +82,61 @@
                 });
                 document.getElementById('trams').innerHTML = html || "Ei lähtöjä";
             } catch (e) { document.getElementById('trams').innerHTML = "<div class='error'>Yhteysvirhe ratikkatietoihin</div>"; }
+        }
+
+        async function updateWeather() {
+            const CACHE_KEY = 'weather_data';
+            const CACHE_TIME_KEY = 'weather_timestamp';
+            const FIFTEEN_MINS = 15 * 60 * 1000; // 15 minutes in milliseconds
+
+            const now = Date.now();
+            const lastFetch = localStorage.getItem(CACHE_TIME_KEY);
+            const cachedData = localStorage.getItem(CACHE_KEY);
+
+            // 1. Check if we have fresh cached data
+            if (lastFetch && cachedData && (now - lastFetch < FIFTEEN_MINS)) {
+                console.log("Using cached weather");
+                displayWeather(JSON.parse(cachedData));
+                return;
+            }
+
+            // 2. Otherwise, fetch fresh data
+            try {
+                const url = 'https://api.open-meteo.com/v1/forecast?latitude=61.4991&longitude=23.7871&current=temperature_2m,apparent_temperature,wind_speed_10m,weather_code&wind_speed_unit=ms';
+                const res = await fetch(url);
+
+                if (res.status === 429) {
+                    throw new Error("Rate limited");
+                }
+
+                const data = await res.json();
+
+                // Save to localStorage
+                localStorage.setItem(CACHE_KEY, JSON.stringify(data));
+                localStorage.setItem(CACHE_TIME_KEY, now.toString());
+
+                displayWeather(data);
+            } catch (e) {
+                // If fetch fails (like 429), try to show the old cache anyway as a fallback
+                if (cachedData) {
+                    displayWeather(JSON.parse(cachedData));
+                    document.getElementById('description').innerHTML += " (Vanha tieto)";
+                } else {
+                    document.getElementById('weather').innerHTML = "Säävirhe";
+                }
+            }
+        }
+
+        function displayWeather(data) {
+            const current = data.current;
+            const temp = Math.round(current.temperature_2m);
+            const feels = Math.round(current.apparent_temperature);
+            const wind = Math.round(current.wind_speed_10m);
+
+            document.getElementById('weather').innerHTML = `${temp}°C`;
+            document.getElementById('description').innerHTML =
+                `${getWeatherText(current.weather_code)} <br>` +
+                `<span style="font-size: 20px;">Tuntuu: ${feels}°C | Tuuli: ${wind} m/s</span>`;
         }
 
         function getWeatherText(code) {
