@@ -56,7 +56,7 @@ HTML_TEMPLATE = """
     <hr>
     <div class="info">Sähkö nyt</div>
     <div class="temp">{{ electricity }} c/kWh</div>
-    <div class="temp" style="margin-top: 20px;">{{ cheap_period }}</div>
+    <div class="info" style="margin-top: 20px;">{{ cheap_period }}</div>
 </body>
 </html>
 """
