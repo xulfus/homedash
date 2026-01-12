@@ -50,14 +50,13 @@ HTML_TEMPLATE = """
     <div class="temp">{{ temp }}°C</div>
     <div class="info">Tuntuu: {{ feels }}°C | Tuuli: {{ wind }} m/s</div>
     <hr>
-    <div class="info">Lentävänniemi A</div>
     {% for tram in trams %}
         <div class="tram">RATIKKA {{ tram.line }}: {{ tram.mins }} min</div>
     {% endfor %}
     <hr>
     <div class="info">Sähkö nyt</div>
     <div class="temp">{{ electricity }} c/kWh</div>
-    <div class="info" style="margin-top: 20px;">{{ cheap_period }}</div>
+    <div class="temp" style="margin-top: 20px;">{{ cheap_period }}</div>
 </body>
 </html>
 """
@@ -120,6 +119,7 @@ def home():
 
         start_hour = int(c_data[0]['aikaleima_suomi'].split('T')[1].split(':')[0])
         end_hour = (int(c_data[-1]['aikaleima_suomi'].split('T')[1].split(':')[0]) + 1) % 24
+        avg_price = sum(h['hinta'] for h in c_data) / len(c_data)
 
         # Check if we're currently in the cheap period
         current_hour = now.hour
@@ -129,9 +129,9 @@ def home():
         else:  # Wraps around midnight
             in_cheap_period = current_hour >= start_hour or current_hour < end_hour
 
-        cheap_period = f"Halvin 2h: {start_hour:02d}-{end_hour:02d}"
+        cheap_period = f"Halvin 2h: {start_hour:02d}-{end_hour:02d} ({avg_price:.1f} c)"
         if in_cheap_period:
-            cheap_period += " (nyt)"
+            cheap_period += " nyt!"
     except Exception as e:
         app.logger.error(f"Cheapest Period Fetch Error: {e}")
         cheap_period = ""
