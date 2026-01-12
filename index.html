@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="refresh" content="60">
+    <style>
+        body {
+            font-family: "Helvetica", sans-serif;
+            background: white;
+            color: black;
+            margin: 40px;
+            text-align: center;
+        }
+
+        #weather {
+            font-size: 80px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        #description {
+            font-size: 30px;
+            margin-bottom: 50px;
+            text-transform: capitalize;
+        }
+
+        .label {
+            font-size: 24px;
+            color: #666;
+            margin-bottom: 10px;
+        }
+
+        .tram-row {
+            font-size: 55px;
+            font-weight: bold;
+            border: 3px solid black;
+            margin: 15px auto;
+            padding: 10px;
+            width: 80%;
+        }
+
+        .error {
+            color: grey;
+            font-size: 20px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="weather">--°C</div>
+    <div id="description">Ladataan säätä...</div>
+
+    <hr style="border: 1px solid black; margin: 40px 0;">
+
+    <div class="label">Pysäkki: Lentävänniemi A</div>
+    <div id="trams">
+        <div class="tram-row">-- min</div>
+        <div class="tram-row">-- min</div>
+    </div>
+
+    <script>
+        async function updateDashboard() {
+            // 1. Fetch Weather (Open-Meteo - No Registration Needed)
+            // Coordinates for Tampere: 61.4991, 23.7871
+            try {
+                // We add wind_speed_unit=ms because in Finland we use m/s, not km/h
+                const url = 'https://api.open-meteo.com/v1/forecast?latitude=61.4991&longitude=23.7871&current=temperature_2m,apparent_temperature,wind_speed_10m,weather_code&wind_speed_unit=ms';
+
+                const res = await fetch(url);
+                const data = await res.json();
+                const current = data.current;
+
+                const temp = Math.round(current.temperature_2m);
+                const feelsLike = Math.round(current.apparent_temperature);
+                const wind = Math.round(current.wind_speed_10m);
+
+                document.getElementById('weather').innerHTML = `
+            ${temp}°C 
+            <div style="font-size: 24px; color: #555;">
+                Tuntuu kuin: ${feelsLike}°C | Tuuli: ${wind} m/s
+            </div>
+        `;
+                document.getElementById('description').innerHTML = getWeatherText(current.weather_code);
+            } catch (e) {
+                document.getElementById('weather').innerHTML = "Säävirhe";
+            }
+
+            // 2. Fetch Trams (Nysse REST Endpoint)
+            try {
+                // IMPORTANT: Insert your specific REST URL here
+                const tRes = await fetch('https://lissu.tampere.fi/timetable/rest/stopdisplays/0870');
+                const tData = await tRes.json();
+                const visits = tData.nextStopVisits[0].stopVisits;
+
+                let html = '';
+                visits.slice(0, 2).forEach(v => {
+                    const mins = v.estimatedMinutesUntilDeparture;
+                    html += `<div class="tram-row">${mins} min</div>`;
+                });
+                document.getElementById('trams').innerHTML = html || "Ei lähtöjä";
+            } catch (e) { document.getElementById('trams').innerHTML = "<div class='error'>Yhteysvirhe ratikkatietoihin</div>"; }
+        }
+
+        function getWeatherText(code) {
+            const codes = {
+                0: "Selkeää", 1: "Melko selkeää", 2: "Puolipilvistä", 3: "Pilvistä",
+                45: "Sumua", 61: "Vesisadetta", 71: "Lumisadetta", 77: "Lumikuuroja",
+                80: "Sadekuuroja", 95: "Ukkosta"
+            };
+            return codes[code] || "Vaihtelevaa";
+        }
+
+        updateDashboard();
+    </script>
+</body>
+
+</html>
