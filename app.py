@@ -69,7 +69,7 @@ def home():
     try:
         e_res = requests.get(ELECTRICITY_URL, timeout=10)
         e_data = e_res.json()
-        electricity = f"{e_data['PriceWithTax']:.2f}"
+        electricity = f"{e_data['PriceWithTax'] * 100:.1f}"
     except Exception as e:
         app.logger.error(f"Electricity Fetch Error: {e}")
         electricity = "?"
