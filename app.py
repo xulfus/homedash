@@ -42,7 +42,7 @@ HTML_TEMPLATE = """
     <style>
         body { font-family: sans-serif; text-align: center; background: white; padding: 20px; }
         .temp { font-size: 80px; font-weight: bold; }
-        .info { font-size: 24px; color: #555; margin-bottom: 40px; }
+        .info { font-size: 40px; color: #555; margin-bottom: 40px; }
         .tram { font-size: 50px; border: 3px solid black; margin: 10px; padding: 10px; }
     </style>
 </head>
